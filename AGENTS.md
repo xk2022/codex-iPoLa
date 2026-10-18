@@ -62,4 +62,3 @@
 - 先閱讀 README.md、backend/README.md、docs/project-brief.md、docs/backend-decisions.md 與 docs/legacy-inventory.md。
 - 後端測試由 backend/ 目錄執行 Maven；任何 Migration 或權限變更先評估資料與安全風險，破壞性變更及認證/授權設定變更必須核准。
 - 不得在未經授權時導入舊資料、建立正式部署或公開敏感位置與個資。
-- 本次僅同步 AGENTS.md，不修改原始碼或部署。
