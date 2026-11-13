@@ -44,7 +44,7 @@ settings 應由執行環境提供，不提交代理位址或憑證。MySQL 測�
 
 `.github/workflows/backend-mysql.yml` 提供 H2/MySQL 兩個 job matrix，MySQL 執行相同腳本；即使失敗也嘗試保存 Surefire 與 MySQL evidence artifact。Action 採固定 commit，權限只讀 contents。此 workflow 僅是後端驗證，不宣稱完成整個專案的 lint、安全掃描或 coverage gate。
 
-實際驗證結果見本文件下方。本次 GitHub Issue API 存取遭 Forbidden，且未建立遠端 CI run；**workflow 已備妥不等於 GitHub CI 通過**。推送至符合觸發條件的分支後，需保留 run URL、commit SHA、H2/MySQL job 結果與 artifact，才算完成使用者要求的遠端 CI 證據。
+實際驗證結果見本文件下方。已推送符合觸發條件的 `feat/ipola-i1-i5-handoff`，測試提交為 `cbe3537b8f1dae7e38dd15dbb6f423e3def8d137`。GitHub Issue 及 Actions runs API 均回覆 Forbidden，無法確認遠端是否啟動或完成；**workflow 已推送不等於 GitHub CI 通過**。需保留 run URL、commit SHA、H2/MySQL job 結果與 artifact，才算完成使用者要求的遠端 CI 證據。
 
 ## 免費方式建議
 
@@ -69,7 +69,7 @@ settings 應由執行環境提供，不提交代理位址或憑證。MySQL 測�
 | MySQL 空 schema | 4 tests，0 failure／error／skip，V1 migration 成功，BUILD SUCCESS | `backend/target/mysql-evidence/fresh-reports/` |
 | 同 MySQL 重跑 | 4 tests，0 failure／error／skip，V1 checksum 驗證通過、schema up to date，BUILD SUCCESS | `backend/target/mysql-evidence/repeat-reports/` |
 | 腳本語法／差異空白 | `bash -n scripts/test-mysql.sh`、`git diff --check` 通過 | 本次命令 |
-| GitHub Actions | **未執行**；無 run URL／遠端 artifact | 等待可用遠端操作與 workflow 觸發 |
+| GitHub Actions | **未取得遠端執行結果**；分支已推送，runs API 回覆 Forbidden | 尚無可驗證的 run URL／遠端 artifact |
 
 腳本 exit 0，該次一次性 MySQL 容器已由 EXIT trap 刪除。三個 Actions commit 均以官方 Git `ls-remote` 核對 tag。下列 SHA-256 用於比對本次本機證據，不替代遠端 CI run，也不包含密碼或完整執行 log：
 

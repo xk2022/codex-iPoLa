@@ -28,6 +28,8 @@ Google 日曆：**未同步**。本次沒有可呼叫的日曆讀寫工具，無
 
 GitHub Issue：**未同步**。Git 可 fetch 不代表 API 可用；GraphQL 與 REST 都回覆 Forbidden。解鎖後先查既有主要任務，再將本文件驗收條件、狀態及證據回填；產品任務只留產品庫。
 
+版本交付：測試與規格提交 `cbe3537b8f1dae7e38dd15dbb6f423e3def8d137` 已推送至 `origin/feat/ipola-i1-i5-handoff`。未建立 PR、未合併 main。Actions runs API 同樣 Forbidden，僅能確認推送符合 workflow 觸發條件，不能確認 run 是否啟動或成功。可由 GitHub 的該分支 Actions 頁查看；恢復 API 後總管應讀回結果與 artifact。
+
 ## 本輪交付狀態
 
 I1／I4：規格草案，未視為安全政策核准或功能完成。I3：技術與驗收方案，尚無手機版實作。I5：上線建議與驗收門檻，未建立公開服務。
