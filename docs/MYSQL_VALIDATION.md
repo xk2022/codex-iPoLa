@@ -59,7 +59,7 @@ settings 應由執行環境提供，不提交代理位址或憑證。MySQL 測�
 - [GitHub Actions 計費](https://docs.github.com/en/billing/managing-billing-for-your-products/managing-billing-for-github-actions/about-billing-for-github-actions)
 - [GitHub Actions artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts)
 
-## 本次執行結果
+## 首批規格階段執行結果（保留歷史）
 
 2026-11-13 Asia/Taipei，Java 21.0.12.1、Maven 3.9.11、官方 MySQL 8.4.13（utf8mb4）。
 
@@ -80,3 +80,24 @@ settings 應由執行環境提供，不提交代理位址或憑證。MySQL 測�
 | `backend/target/h2-evidence/TEST-tw.ipola.ApiIntegrationTest.xml` | `c2ab9a4ae106020ded06bd0c2f56c5995a91e5514eed546a9b56051a02a1ee94` |
 | `backend/target/mysql-evidence/fresh-reports/TEST-tw.ipola.ApiIntegrationTest.xml` | `7236149c27f01ba6c416c519ddd0b8ede0d2773c78a63a3456fdaf81748f8835` |
 | `backend/target/mysql-evidence/repeat-reports/TEST-tw.ipola.ApiIntegrationTest.xml` | `a13fd8f816c9f49761d6fdcb8cdbcde0a0a444aa761f2969771482db0d3d7e1f` |
+
+## 核准後最終實作驗證
+
+使用者核准邀請制、本人內容／修正與前端依賴後，測試擴充為 9 項（ApiIntegrationTest 8 項、InvitationIntegrationTest 1 項）。最終 H2、MySQL 8.4.13 空庫及同庫重啟三輪均為 **9 tests，0 failure／error／skip，BUILD SUCCESS**。MySQL 首輪套用 V1＋V2，第二輪驗證相同 schema 已最新。最終照片處理的 multipart threshold、ImageIO 輸入／輸出記憶體 cache 已納入三輪相同來源驗證。
+
+新增驗證：本人／其他登入者所有列表的內容遮罩、本人 PUT／DELETE 與版本衝突、跨會員拒絕、私有照片端點、PNG／JPEG 重新編碼及 metadata 清除、EXIF orientation6、1600px 縮圖、超尺寸／超像素／錯格式拒絕、邀請碼缺少／錯誤／正確／重放。正負端點格網也已回歸。這些不包含備份還原、限流或帳號復原。
+
+| 當輪報告 | SHA-256 |
+| --- | --- |
+| H2 `h2-approved-evidence/TEST-tw.ipola.ApiIntegrationTest.xml` | `d885b56f3a0433bda14f4f84a958bb62c6068a141656a6e44b526e0e899fac36` |
+| H2 `h2-approved-evidence/TEST-tw.ipola.InvitationIntegrationTest.xml` | `e07137210948812642b256a30f30f5260e6042478d579a12d9ca09cb550bb528` |
+| MySQL `fresh-reports/TEST-tw.ipola.ApiIntegrationTest.xml` | `c8d8ae0365f05ac38ac73d466abdd67d0c4ae162f5c142fa56c99057454fe746` |
+| MySQL `fresh-reports/TEST-tw.ipola.InvitationIntegrationTest.xml` | `1b3ad31f75703bc2dd1c52c4482f81f79bf5aed5a274567376886e76819b7b0c` |
+| MySQL `repeat-reports/TEST-tw.ipola.ApiIntegrationTest.xml` | `288333cad7c5561ebb2dd6d2a2f8da0756e9c60c708737cf26bfdfdf6a161ea3` |
+| MySQL `repeat-reports/TEST-tw.ipola.InvitationIntegrationTest.xml` | `11a9cddf68e9f731b13486e5569ff1803e433ad11f0580cd9f26341c3ebc14c4` |
+
+H2 目錄位於 `backend/target/h2-approved-evidence/`；MySQL 目錄位於 `backend/target/mysql-evidence/`。新報告取代先前 4 項階段結果，舊 hash 僅作歷史，不應與目前輸出比對。
+
+前端 TypeScript strict＋Vite build、完整 npm audit（0 vulnerabilities）已通過。Node 24 原生 CDP＋系統 Chromium 的手機 smoke 在隔離 H2、真實 HTTP API 通過 16 項檢查，含 360／390／1280px、登入、兩種紀錄、定位拒絕與手動輸入、本人內容／照片／修正刪除、分頁、登出與實際撤銷 token。命令 `node scripts/mobile-smoke.mjs`，結果 `artifacts/mobile-smoke.json` 與合成資料截圖；不是 MySQL 手機 E2E，也不是外部 staging。
+
+CI workflow 已加入 Node 安裝、前端 frozen install／build／audit、瀏覽器 smoke 與 artifacts。遠端 API 存取仍受限，必須另取得 run 結果後才可標遠端 CI 完成。最新啟動與限制見 [本機 staging](LOCAL_STAGING.md)。
