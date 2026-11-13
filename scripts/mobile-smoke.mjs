@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {stripVTControlCharacters} from 'node:util';
 import {spawn} from 'node:child_process';
 import {mkdir, mkdtemp, writeFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -24,7 +25,8 @@ async function start(command, args, options = {}) {
   let output='';
   for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>{
     output=(output+chunk.toString()).slice(-16384);
-    if(readyPattern?.test(output))state.ready=true;
+    // GitHub Actions enables ANSI styling, including between Local and its colon.
+    if(readyPattern?.test(stripVTControlCharacters(output)))state.ready=true;
   });
   child.on('error', error => { state.error=error; });
   children.push(child); return state;
