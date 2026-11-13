@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.security.core.Authentication;
@@ -18,10 +19,12 @@ import org.springframework.web.server.ResponseStatusException;
 class ApiService {
  private final JdbcTemplate db;
  private final PasswordEncoder passwords;
+ @Value("${ipola.registration.open:false}") private boolean registrationOpen;
+ @Value("${ipola.registration.invitations:${IPOLA_INVITATION_CODES:}}") private String invitations;
  ApiService(JdbcTemplate db, PasswordEncoder passwords) { this.db=db; this.passwords=passwords; }
  enum Species { CAT, DOG }
  enum Kind { SIGHTING, FEEDING }
- record Register(@NotBlank @Email @Size(max=254) String email, @NotBlank @Size(max=60) String nickname, @NotBlank @Size(min=10,max=72) String password) {}
+ record Register(@NotBlank @Email @Size(max=254) String email, @NotBlank @Size(max=60) String nickname, @NotBlank @Size(min=10,max=72) String password, @Size(max=128) String invitationCode) {}
  record Login(@NotBlank @Email @Size(max=254) String email, @NotBlank @Size(max=72) String password) {}
  record AnimalInput(@NotNull Species species, @NotBlank @Size(max=80) String name, @NotNull @Size(max=1000) String description) {}
  record ObservationInput(Long animalId, @NotNull Kind kind, @NotNull @PastOrPresent Instant observedAt,
@@ -29,14 +32,18 @@ class ApiService {
   @NotNull @DecimalMin("-180") @DecimalMax("180") Double longitude,
   @NotNull @Size(max=1000) String notes,
   @Size(max=1000) @Pattern(regexp="https://[^\\s]+", message="must be an HTTPS URL") String photoUrl) {}
+ record ObservationUpdate(@NotNull @Min(0) Long version, Long animalId, @NotNull Kind kind, @NotNull @PastOrPresent Instant observedAt,
+  @NotNull @DecimalMin("-90") @DecimalMax("90") Double latitude,
+  @NotNull @DecimalMin("-180") @DecimalMax("180") Double longitude, @NotNull @Size(max=1000) String notes) {}
  record Member(long id, String nickname) {}
  record Token(String accessToken, Instant expiresAt, Member member) {}
  record Animal(long id, Species species, String name, String description) {}
- record Observation(long id, Long animalId, Kind kind, Instant observedAt, double latitude, double longitude, String locationPrecision, String notes, String photoUrl, Member recorder) {}
+ record Observation(long id, long version, Long animalId, Kind kind, Instant observedAt, double latitude, double longitude, String locationPrecision, String notes, String photoUrl, boolean hasPhoto, Member recorder) {}
  record Page<T>(List<T> items, int limit, int offset) {}
 
   @Transactional
  Member register(Register input) {
+  if (!registrationOpen && !invited(input.email(),input.invitationCode())) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Registration is invitation only");
   checkPassword(input.password());
   long id = insert("INSERT INTO members(email,nickname,password_hash) VALUES (?,?,?)", input.email().toLowerCase(Locale.ROOT), input.nickname(), passwords.encode(input.password()));
   return new Member(id,input.nickname());
@@ -70,7 +77,7 @@ class ApiService {
  Map<String,Long> createObservation(ObservationInput input,Authentication auth) {
   if(input.animalId()!=null) animal(input.animalId());
   long id=insert("INSERT INTO observations(animal_id,member_id,kind,observed_at,latitude,longitude,notes,photo_url) VALUES (?,?,?,?,?,?,?,?)",input.animalId(),memberId(auth),input.kind().name(),Timestamp.from(input.observedAt()),input.latitude(),input.longitude(),input.notes(),input.photoUrl());
-  return Map.of("id",id);
+  return Map.of("id",id,"version",0L);
  }
   Page<Observation> observations(Long animalId,int limit,int offset,Authentication auth) {
   return observationsFor(animalId,null,limit,offset,auth);
@@ -87,11 +94,23 @@ class ApiService {
   sql+=" ORDER BY o.observed_at DESC,o.id DESC LIMIT ? OFFSET ?";args.add(limit);args.add(offset);
   return new Page<>(db.query(sql,(r,n)->{
    double lat=r.getDouble("latitude"),lon=r.getDouble("longitude");
-   if(!precise){lat=coarse(lat);lon=coarse(lon);}
-   return new Observation(r.getLong("id"),r.getObject("animal_id",Long.class),Kind.valueOf(r.getString("kind")),r.getTimestamp("observed_at").toInstant(),lat,lon,precise?"EXACT":"APPROXIMATE",precise?r.getString("notes"):null,precise?r.getString("photo_url"):null,new Member(r.getLong("member_id"),r.getString("nickname")));
+   if(!precise){lat=coarse(lat,90);lon=coarse(lon,180);}
+   boolean owner=precise && memberId(auth)==r.getLong("member_id");
+   String photo=owner && r.getString("photo_key")!=null ? "/api/observations/"+r.getLong("id")+"/photo" : null;
+   return new Observation(r.getLong("id"),r.getLong("version"),r.getObject("animal_id",Long.class),Kind.valueOf(r.getString("kind")),r.getTimestamp("observed_at").toInstant(),lat,lon,precise?"EXACT":"APPROXIMATE",owner?r.getString("notes"):null,photo,photo!=null,new Member(r.getLong("member_id"),r.getString("nickname")));
   },args.toArray()),limit,offset);
  }
- private static double coarse(double v){return (Math.floor(v*100)+0.5)/100;}
+ private boolean invited(String email,String code) {
+  if(code==null || !code.matches("[A-Za-z0-9_-]{32,128}"))return false;
+  return Arrays.stream(invitations.split(",")).map(String::trim).anyMatch(entry->{
+   int colon=entry.indexOf(':');
+   if(colon<1)return false;
+   String allowed=entry.substring(0,colon).trim(),expected=entry.substring(colon+1).trim();
+   return allowed.equalsIgnoreCase(email) && expected.matches("[A-Za-z0-9_-]{32,128}")
+    && java.security.MessageDigest.isEqual(expected.getBytes(java.nio.charset.StandardCharsets.UTF_8),code.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  });
+ }
+ private static double coarse(double v,double maximum){return Math.min(maximum-0.005,(Math.floor(v*100)+0.5)/100);}
  private static long memberId(Authentication auth){return (Long)auth.getPrincipal();}
  private static void pageCheck(int limit,int offset){if(limit<1||limit>100||offset<0)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid pagination");}
  private static void checkPassword(String password){if(password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>72)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Password exceeds 72 UTF-8 bytes");}
